@@ -1,0 +1,13 @@
+.nuxt
+.output
+dist
+node_modules
+*.min.js
+coverage
+public
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+*.log
+.env
+.env.*
