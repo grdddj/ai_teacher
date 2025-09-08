@@ -7,6 +7,14 @@
 
 ```bash
 npx nuxi@latest init scio-app
-npm install
-npm run dev
+bun install
+bun dev
+```
+
+## Dev commands
+
+```bash
+bun lint
+bun lint:fix
+bun format
 ```
