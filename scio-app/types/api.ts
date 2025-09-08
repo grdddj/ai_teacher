@@ -78,3 +78,15 @@ export interface UpdateNicknameResponse {
   nickname: string
   timestamp: string
 }
+
+export interface SendMessageRequest {
+  groupId: string
+  deviceId: string
+  content: string
+}
+
+export interface SendMessageResponse {
+  success: boolean
+  message: Message
+  timestamp: string
+}
