@@ -299,6 +299,11 @@
                   >
                     Created
                   </th>
+                  <th
+                    class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider"
+                  >
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody class="bg-white divide-y divide-slate-200">
@@ -321,10 +326,62 @@
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                     {{ formatDate(group.created_at) }}
                   </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <button
+                      class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                      @click="showQRCode(group.id)"
+                    >
+                      <svg
+                        class="w-4 h-4 mr-2"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M12 12V8m0 0h.01M12 12a1 1 0 000 2h.01M12 12a1 1 0 000-2h.01"
+                        />
+                      </svg>
+                      Show QR
+                    </button>
+                  </td>
                 </tr>
               </tbody>
             </table>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- QR Code Modal -->
+    <div
+      v-if="showModal"
+      class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+      @click="closeModal"
+    >
+      <div class="bg-white rounded-xl shadow-lg p-6 max-w-md w-full" @click.stop>
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-semibold text-slate-900">Group QR Code</h3>
+          <button class="text-slate-400 hover:text-slate-600 transition-colors" @click="closeModal">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <div class="text-center">
+          <div class="mb-4 p-4 bg-white border-2 border-slate-200 rounded-lg inline-block">
+            <div class="w-48 h-48 mx-auto" v-html="qrCodeSVG"></div>
+          </div>
+          <p class="text-sm text-slate-600 mb-2">Scan to join group</p>
+          <p class="text-xs text-slate-500 break-all">{{ joinUrl }}</p>
         </div>
       </div>
     </div>
@@ -333,6 +390,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { renderSVG } from 'uqr'
 import type {
   HelloResponse,
   GroupsResponse,
@@ -365,6 +423,11 @@ const newGroup = ref<CreateGroupRequest>({
 // Create group functionality
 const createPending = ref(false)
 
+// QR Code modal functionality
+const showModal = ref(false)
+const qrCodeSVG = ref('')
+const joinUrl = ref('')
+
 const createGroup = async () => {
   createPending.value = true
 
@@ -391,6 +454,27 @@ const createGroup = async () => {
   } finally {
     createPending.value = false
   }
+}
+
+// QR Code functions
+const showQRCode = (groupId: string) => {
+  const currentUrl = window.location
+  joinUrl.value = `${currentUrl.protocol}//${currentUrl.host}/join/${groupId}`
+
+  qrCodeSVG.value = renderSVG(joinUrl.value, {
+    pixelSize: 4,
+    border: 2,
+    blackColor: '#1e293b',
+    whiteColor: '#ffffff',
+  })
+
+  showModal.value = true
+}
+
+const closeModal = () => {
+  showModal.value = false
+  qrCodeSVG.value = ''
+  joinUrl.value = ''
 }
 
 // Utility function to format dates
