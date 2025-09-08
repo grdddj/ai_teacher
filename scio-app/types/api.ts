@@ -35,3 +35,26 @@ export interface CreateGroupResponse {
   message: string
   timestamp: string
 }
+
+export interface JoinGroupRequest {
+  groupId: string
+  deviceId?: string
+  nickname: string
+}
+
+export interface JoinGroupResponse {
+  success: boolean
+  deviceId: string
+  group: {
+    id: string
+    name: string
+    description: string
+  }
+  messages: Array<{
+    id: string
+    deviceId: string
+    content: string
+    createdAt: string
+  }>
+  timestamp: string
+}

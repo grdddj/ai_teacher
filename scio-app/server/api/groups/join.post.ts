@@ -1,0 +1,147 @@
+import { supabase } from '../../database'
+import type { JoinGroupRequest, JoinGroupResponse } from '../../../types/api'
+import { randomUUID } from 'crypto'
+
+export default defineEventHandler(async (event): Promise<JoinGroupResponse> => {
+  try {
+    const body = await readBody<JoinGroupRequest>(event)
+
+    // Basic validation
+    if (!body.groupId || !body.nickname) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Missing required fields: groupId, nickname',
+      })
+    }
+
+    const { groupId, deviceId, nickname } = body
+
+    // Check if group exists
+    const { data: group, error: groupError } = await supabase
+      .from('groups')
+      .select('id, name, description')
+      .eq('id', groupId)
+      .single()
+
+    if (groupError || !group) {
+      throw createError({
+        statusCode: 404,
+        statusMessage: 'Group not found',
+      })
+    }
+
+    let finalDeviceId = deviceId
+
+    // If deviceId is not provided, create a new device
+    if (!finalDeviceId) {
+      finalDeviceId = randomUUID()
+
+      const { error: deviceError } = await supabase
+        .from('devices')
+        .insert({
+          id: finalDeviceId,
+          nickname,
+        })
+        .select('id')
+        .single()
+
+      if (deviceError) {
+        throw deviceError
+      }
+    } else {
+      // Check if device exists and update nickname if it does
+      const { error: deviceCheckError } = await supabase
+        .from('devices')
+        .select('id')
+        .eq('id', finalDeviceId)
+        .single()
+
+      if (deviceCheckError && deviceCheckError.code === 'PGRST116') {
+        // Device doesn't exist, create it
+        const { error: createError } = await supabase.from('devices').insert({
+          id: finalDeviceId,
+          nickname,
+        })
+
+        if (createError) {
+          throw createError
+        }
+      } else if (!deviceCheckError) {
+        // Device exists, update nickname
+        const { error: updateError } = await supabase
+          .from('devices')
+          .update({ nickname })
+          .eq('id', finalDeviceId)
+
+        if (updateError) {
+          throw updateError
+        }
+      } else {
+        throw deviceCheckError
+      }
+    }
+
+    // Check if device is already a member of this group
+    const { error: membershipError } = await supabase
+      .from('group_members')
+      .select('id')
+      .eq('group_id', groupId)
+      .eq('device_id', finalDeviceId)
+      .single()
+
+    // If not a member, add to group
+    if (membershipError && membershipError.code === 'PGRST116') {
+      const { error: joinError } = await supabase.from('group_members').insert({
+        group_id: groupId,
+        device_id: finalDeviceId,
+      })
+
+      if (joinError) {
+        throw joinError
+      }
+    } else if (membershipError) {
+      throw membershipError
+    }
+
+    // Get group messages
+    const { data: messages, error: messagesError } = await supabase
+      .from('group_messages')
+      .select('id, device_id, content, created_at')
+      .eq('group_id', groupId)
+      .order('created_at', { ascending: true })
+
+    if (messagesError) {
+      throw messagesError
+    }
+
+    // Return response
+    return {
+      success: true,
+      deviceId: finalDeviceId,
+      group: {
+        id: group.id,
+        name: group.name,
+        description: group.description,
+      },
+      messages: (messages || []).map((msg) => ({
+        id: msg.id,
+        deviceId: msg.device_id,
+        content: msg.content,
+        createdAt: msg.created_at,
+      })),
+      timestamp: new Date().toISOString(),
+    }
+  } catch (error: any) {
+    console.error('Join group error:', error)
+
+    if (error.statusCode) {
+      throw error
+    }
+
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Internal server error',
+      data: error.message,
+    })
+  }
+})
