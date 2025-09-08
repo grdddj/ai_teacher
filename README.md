@@ -7,6 +7,7 @@
 
 ```bash
 npx nuxi@latest init scio-app
+curl -fsSL https://bun.sh/install | bash
 bun install
 bun dev
 ```

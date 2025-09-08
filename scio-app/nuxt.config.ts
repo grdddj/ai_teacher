@@ -6,4 +6,22 @@ export default defineNuxtConfig({
   typescript: {
     includeWorkspace: true,
   },
+  vite: {
+    server: {
+      hmr: {
+        clientPort: 3000,
+      },
+      host: true,
+      allowedHosts: [
+        'localhost',
+        '127.0.0.1',
+        'aiteacher.jirkuvserver.cz',
+        '.jirkuvserver.cz',
+      ],
+    },
+  },
+  devServer: {
+    host: '0.0.0.0',
+    port: 3000,
+  },
 })
