@@ -11,3 +11,5 @@ sh
 bun lint:fix
 bun format
 ```
+
+Also, do not run `npm run dev`, rather use `bun dev` to run the development server.

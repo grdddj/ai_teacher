@@ -7,10 +7,10 @@ export default defineEventHandler(async (event): Promise<JoinGroupResponse> => {
     const body = await readBody<JoinGroupRequest>(event)
 
     // Basic validation
-    if (!body.groupId || !body.nickname) {
+    if (!body.groupId) {
       throw createError({
         statusCode: 400,
-        statusMessage: 'Missing required fields: groupId, nickname',
+        statusMessage: 'Missing required field: groupId',
       })
     }
 
@@ -40,7 +40,7 @@ export default defineEventHandler(async (event): Promise<JoinGroupResponse> => {
         .from('devices')
         .insert({
           id: finalDeviceId,
-          nickname,
+          nickname: nickname || null, // Allow null nickname
         })
         .select('id')
         .single()
@@ -49,10 +49,10 @@ export default defineEventHandler(async (event): Promise<JoinGroupResponse> => {
         throw deviceError
       }
     } else {
-      // Check if device exists and update nickname if it does
-      const { error: deviceCheckError } = await supabase
+      // Check if device exists
+      const { data: existingDevice, error: deviceCheckError } = await supabase
         .from('devices')
-        .select('id')
+        .select('id, nickname')
         .eq('id', finalDeviceId)
         .single()
 
@@ -60,14 +60,14 @@ export default defineEventHandler(async (event): Promise<JoinGroupResponse> => {
         // Device doesn't exist, create it
         const { error: createError } = await supabase.from('devices').insert({
           id: finalDeviceId,
-          nickname,
+          nickname: nickname || null, // Allow null nickname
         })
 
         if (createError) {
           throw createError
         }
-      } else if (!deviceCheckError) {
-        // Device exists, update nickname
+      } else if (!deviceCheckError && nickname && nickname !== existingDevice.nickname) {
+        // Device exists and nickname is provided and different, update it
         const { error: updateError } = await supabase
           .from('devices')
           .update({ nickname })
@@ -76,7 +76,7 @@ export default defineEventHandler(async (event): Promise<JoinGroupResponse> => {
         if (updateError) {
           throw updateError
         }
-      } else {
+      } else if (deviceCheckError) {
         throw deviceCheckError
       }
     }
@@ -114,10 +114,22 @@ export default defineEventHandler(async (event): Promise<JoinGroupResponse> => {
       throw messagesError
     }
 
+    // Get the device info to include current nickname
+    const { data: deviceInfo, error: deviceInfoError } = await supabase
+      .from('devices')
+      .select('nickname')
+      .eq('id', finalDeviceId)
+      .single()
+
+    if (deviceInfoError) {
+      throw deviceInfoError
+    }
+
     // Return response
     return {
       success: true,
       deviceId: finalDeviceId,
+      deviceNickname: deviceInfo.nickname,
       group: {
         id: group.id,
         name: group.name,

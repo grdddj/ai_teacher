@@ -39,12 +39,13 @@ export interface CreateGroupResponse {
 export interface JoinGroupRequest {
   groupId: string
   deviceId?: string
-  nickname: string
+  nickname?: string
 }
 
 export interface JoinGroupResponse {
   success: boolean
   deviceId: string
+  deviceNickname: string | null
   group: {
     id: string
     name: string
@@ -56,5 +57,17 @@ export interface JoinGroupResponse {
     content: string
     createdAt: string
   }>
+  timestamp: string
+}
+
+export interface UpdateNicknameRequest {
+  deviceId: string
+  nickname: string
+}
+
+export interface UpdateNicknameResponse {
+  success: boolean
+  deviceId: string
+  nickname: string
   timestamp: string
 }

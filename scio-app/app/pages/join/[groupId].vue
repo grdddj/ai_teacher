@@ -49,14 +49,17 @@
         </div>
       </div>
 
-      <!-- Join Form -->
-      <div v-else-if="!joined" class="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
+      <!-- Set Nickname Form -->
+      <div
+        v-else-if="needsNickname"
+        class="bg-white rounded-xl shadow-sm border border-slate-200 p-8"
+      >
         <div class="text-center mb-6">
-          <h2 class="text-xl font-semibold text-slate-900 mb-2">Ready to join?</h2>
-          <p class="text-slate-600">Please enter your nickname to join the group</p>
+          <h2 class="text-xl font-semibold text-slate-900 mb-2">Almost there!</h2>
+          <p class="text-slate-600">Please enter your nickname to complete joining the group</p>
         </div>
 
-        <form class="space-y-6" @submit.prevent="joinGroup">
+        <form class="space-y-6" @submit.prevent="setNickname">
           <div>
             <label for="nickname" class="block text-sm font-medium text-slate-700 mb-2">
               Your Nickname
@@ -73,11 +76,11 @@
 
           <button
             type="submit"
-            :disabled="joining || !nickname.trim()"
+            :disabled="settingNickname || !nickname.trim()"
             class="w-full inline-flex justify-center items-center px-6 py-3 border border-transparent text-base font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <svg
-              v-if="joining"
+              v-if="settingNickname"
               class="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
@@ -97,7 +100,7 @@
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               ></path>
             </svg>
-            {{ joining ? 'Joining...' : 'Join Group' }}
+            {{ settingNickname ? 'Setting nickname...' : 'Set Nickname' }}
           </button>
         </form>
       </div>
@@ -120,7 +123,8 @@
           <p class="text-slate-600 mb-4">
             You have successfully joined the group. You can now start participating.
           </p>
-          <p class="text-sm text-slate-500">Group: {{ joinData?.group?.name }}</p>
+          <p class="text-sm text-slate-500 mb-2">Group: {{ joinData?.group?.name }}</p>
+          <p class="text-sm text-slate-500">Welcome, {{ joinData?.deviceNickname }}!</p>
         </div>
       </div>
     </div>
@@ -129,7 +133,12 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import type { JoinGroupRequest, JoinGroupResponse } from '../../../types/api'
+import type {
+  JoinGroupRequest,
+  JoinGroupResponse,
+  UpdateNicknameRequest,
+  UpdateNicknameResponse,
+} from '../../../types/api'
 
 // Get the groupId from the route
 const route = useRoute()
@@ -139,7 +148,8 @@ const groupId = route.params.groupId as string
 const pending = ref(true)
 const error = ref('')
 const joined = ref(false)
-const joining = ref(false)
+const needsNickname = ref(false)
+const settingNickname = ref(false)
 const nickname = ref('')
 const joinData = ref<JoinGroupResponse | null>(null)
 
@@ -157,38 +167,14 @@ const setDeviceId = (deviceId: string): void => {
   }
 }
 
-// Check if device is already in this group
-const checkExistingMembership = async () => {
-  const deviceId = getDeviceId()
-  if (!deviceId) {
-    pending.value = false
-    return
-  }
-
-  try {
-    // TODO: We'll implement this check when the API endpoint is ready
-    // For now, just proceed to nickname input
-    pending.value = false
-  } catch (err: any) {
-    console.error('Error checking membership:', err)
-    pending.value = false
-  }
-}
-
-// Join group function
-const joinGroup = async () => {
-  if (!nickname.value.trim()) return
-
-  joining.value = true
-  error.value = ''
-
+// Try to join group automatically with deviceId
+const attemptJoinGroup = async () => {
   try {
     const deviceId = getDeviceId()
 
     const requestBody: JoinGroupRequest = {
       groupId,
       deviceId: deviceId || undefined,
-      nickname: nickname.value.trim(),
     }
 
     const response = await $fetch<JoinGroupResponse>('/api/groups/join', {
@@ -196,18 +182,61 @@ const joinGroup = async () => {
       body: requestBody,
     })
 
-    // Store the device ID if it's new
+    // Store the device ID
     if (response.deviceId) {
       setDeviceId(response.deviceId)
     }
 
     joinData.value = response
-    joined.value = true
+
+    // Check if user has a nickname
+    if (response.deviceNickname) {
+      // User has nickname, they're fully joined
+      joined.value = true
+    } else {
+      // User needs to set nickname
+      needsNickname.value = true
+    }
+
+    pending.value = false
   } catch (err: any) {
     console.error('Failed to join group:', err)
     error.value = err.message || 'Failed to join group'
+    pending.value = false
+  }
+}
+
+// Set nickname function
+const setNickname = async () => {
+  if (!nickname.value.trim() || !joinData.value) return
+
+  settingNickname.value = true
+  error.value = ''
+
+  try {
+    const requestBody: UpdateNicknameRequest = {
+      deviceId: joinData.value.deviceId,
+      nickname: nickname.value.trim(),
+    }
+
+    await $fetch<UpdateNicknameResponse>('/api/devices/nickname', {
+      method: 'POST',
+      body: requestBody,
+    })
+
+    // Update local data
+    if (joinData.value) {
+      joinData.value.deviceNickname = nickname.value.trim()
+    }
+
+    // Mark as fully joined
+    needsNickname.value = false
+    joined.value = true
+  } catch (err: any) {
+    console.error('Failed to set nickname:', err)
+    error.value = err.message || 'Failed to set nickname'
   } finally {
-    joining.value = false
+    settingNickname.value = false
   }
 }
 
@@ -219,6 +248,6 @@ onMounted(() => {
     return
   }
 
-  checkExistingMembership()
+  attemptJoinGroup()
 })
 </script>
