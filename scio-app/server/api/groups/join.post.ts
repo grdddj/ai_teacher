@@ -1,5 +1,6 @@
 import { supabase } from '../../database'
 import type { JoinGroupRequest, JoinGroupResponse } from '../../../types/api'
+import { MessageSource } from '../../../types/api'
 import { randomUUID } from 'crypto'
 
 export default defineEventHandler(async (event): Promise<JoinGroupResponse> => {
@@ -137,17 +138,19 @@ export default defineEventHandler(async (event): Promise<JoinGroupResponse> => {
         description: group.description,
       },
       messages: [
-        // Add first message with group description
+        // Add first message with group description (system message)
         {
           id: 'welcome-' + Math.random().toString(36).substring(2, 11),
           content: group.description,
           createdAt: new Date().toISOString(),
+          source: MessageSource.System,
         },
         // Add user's messages
         ...(messages || []).map((msg: any) => ({
           id: msg.id,
           content: msg.content,
           createdAt: msg.created_at,
+          source: MessageSource.User,
         })),
       ],
       timestamp: new Date().toISOString(),

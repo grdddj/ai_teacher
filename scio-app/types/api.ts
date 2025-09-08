@@ -36,6 +36,18 @@ export interface CreateGroupResponse {
   timestamp: string
 }
 
+export enum MessageSource {
+  User = 'user',
+  System = 'system',
+}
+
+export interface Message {
+  id: string
+  content: string
+  createdAt: string
+  source: MessageSource
+}
+
 export interface JoinGroupRequest {
   groupId: string
   deviceId?: string
@@ -51,11 +63,7 @@ export interface JoinGroupResponse {
     name: string
     description: string
   }
-  messages: Array<{
-    id: string
-    content: string
-    createdAt: string
-  }>
+  messages: Message[]
   timestamp: string
 }
 

@@ -123,12 +123,44 @@
 
         <!-- Messages Area -->
         <div ref="messagesContainer" class="h-96 overflow-y-auto p-4 space-y-3">
-          <div v-for="message in joinData?.messages || []" :key="message.id" class="flex">
+          <div
+            v-for="message in joinData?.messages || []"
+            :key="message.id"
+            class="flex"
+            :class="{
+              'justify-center': message.source === MessageSource.System,
+              'justify-end': message.source === MessageSource.User,
+            }"
+          >
+            <!-- System Message -->
             <div
-              class="max-w-xs lg:max-w-md px-4 py-2 rounded-lg text-sm bg-slate-100 text-slate-900"
+              v-if="message.source === MessageSource.System"
+              class="max-w-md mx-auto px-4 py-3 rounded-lg text-sm bg-blue-50 text-blue-800 border border-blue-200 text-center"
+            >
+              <div class="flex items-center justify-center mb-2">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+                <span class="font-medium text-xs">GOAL</span>
+              </div>
+              <div class="leading-relaxed">{{ message.content }}</div>
+              <div class="text-xs mt-2 opacity-70 text-blue-600">
+                {{ formatMessageTime(message.createdAt) }}
+              </div>
+            </div>
+
+            <!-- User Message -->
+            <div
+              v-else
+              class="max-w-xs lg:max-w-md px-4 py-2 rounded-lg text-sm bg-blue-500 text-white"
             >
               <div>{{ message.content }}</div>
-              <div class="text-xs mt-1 opacity-70 text-slate-500">
+              <div class="text-xs mt-1 opacity-70 text-blue-100">
                 {{ formatMessageTime(message.createdAt) }}
               </div>
             </div>
@@ -177,6 +209,7 @@ import type {
   UpdateNicknameRequest,
   UpdateNicknameResponse,
 } from '../../../types/api'
+import { MessageSource } from '../../../types/api'
 
 // Get the groupId from the route
 const route = useRoute()
