@@ -89,7 +89,7 @@ export default defineEventHandler(async (event): Promise<JoinGroupResponse> => {
       .eq('device_id', finalDeviceId)
       .single()
 
-    // If not a member, add to group
+    // If not a member, add to group and create welcome message
     if (membershipError && membershipError.code === 'PGRST116') {
       const { error: joinError } = await supabase.from('group_members').insert({
         group_id: groupId,
@@ -103,11 +103,12 @@ export default defineEventHandler(async (event): Promise<JoinGroupResponse> => {
       throw membershipError
     }
 
-    // Get group messages
+    // Get messages for this specific device only
     const { data: messages, error: messagesError } = await supabase
       .from('group_messages')
-      .select('id, device_id, content, created_at')
+      .select('id, content, created_at')
       .eq('group_id', groupId)
+      .eq('device_id', finalDeviceId)
       .order('created_at', { ascending: true })
 
     if (messagesError) {
@@ -135,12 +136,20 @@ export default defineEventHandler(async (event): Promise<JoinGroupResponse> => {
         name: group.name,
         description: group.description,
       },
-      messages: (messages || []).map((msg) => ({
-        id: msg.id,
-        deviceId: msg.device_id,
-        content: msg.content,
-        createdAt: msg.created_at,
-      })),
+      messages: [
+        // Add first message with group description
+        {
+          id: 'welcome-' + Math.random().toString(36).substring(2, 11),
+          content: group.description,
+          createdAt: new Date().toISOString(),
+        },
+        // Add user's messages
+        ...(messages || []).map((msg: any) => ({
+          id: msg.id,
+          content: msg.content,
+          createdAt: msg.created_at,
+        })),
+      ],
       timestamp: new Date().toISOString(),
     }
   } catch (error: any) {

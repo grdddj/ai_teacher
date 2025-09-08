@@ -105,26 +105,64 @@
         </form>
       </div>
 
-      <!-- Success State -->
-      <div v-else class="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
-        <div class="text-center">
-          <div
-            class="flex items-center justify-center w-16 h-16 mx-auto mb-4 text-green-600 bg-green-100 rounded-full"
-          >
-            <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+      <!-- Chat Interface -->
+      <div v-else class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <!-- Chat Header -->
+        <div class="bg-slate-50 border-b border-slate-200 p-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-lg font-semibold text-slate-900">{{ joinData?.group?.name }}</h2>
+              <p class="text-sm text-slate-600">Welcome, {{ joinData?.deviceNickname }}!</p>
+            </div>
+            <div class="flex items-center text-green-600">
+              <div class="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
+              <span class="text-sm font-medium">Connected</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Messages Area -->
+        <div ref="messagesContainer" class="h-96 overflow-y-auto p-4 space-y-3">
+          <div v-for="message in joinData?.messages || []" :key="message.id" class="flex">
+            <div
+              class="max-w-xs lg:max-w-md px-4 py-2 rounded-lg text-sm bg-slate-100 text-slate-900"
+            >
+              <div>{{ message.content }}</div>
+              <div class="text-xs mt-1 opacity-70 text-slate-500">
+                {{ formatMessageTime(message.createdAt) }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Empty state -->
+          <div v-if="!joinData?.messages?.length" class="text-center py-8">
+            <div class="text-slate-400 mb-2">
+              <svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                />
+              </svg>
+            </div>
+            <p class="text-slate-500 text-sm">No messages yet. Start the conversation!</p>
+          </div>
+        </div>
+
+        <!-- Message Input Area (placeholder for future) -->
+        <div class="border-t border-slate-200 p-4">
+          <div class="flex items-center text-slate-400 text-sm">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
-                fill-rule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                clip-rule="evenodd"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
+            Message input will be available in the next step
           </div>
-          <h2 class="text-xl font-semibold text-slate-900 mb-2">Welcome to the group!</h2>
-          <p class="text-slate-600 mb-4">
-            You have successfully joined the group. You can now start participating.
-          </p>
-          <p class="text-sm text-slate-500 mb-2">Group: {{ joinData?.group?.name }}</p>
-          <p class="text-sm text-slate-500">Welcome, {{ joinData?.deviceNickname }}!</p>
         </div>
       </div>
     </div>
@@ -132,7 +170,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import type {
   JoinGroupRequest,
   JoinGroupResponse,
@@ -152,6 +190,9 @@ const needsNickname = ref(false)
 const settingNickname = ref(false)
 const nickname = ref('')
 const joinData = ref<JoinGroupResponse | null>(null)
+
+// Template refs
+const messagesContainer = ref<HTMLElement | null>(null)
 
 // Device ID management
 const getDeviceId = (): string | null => {
@@ -193,6 +234,10 @@ const attemptJoinGroup = async () => {
     if (response.deviceNickname) {
       // User has nickname, they're fully joined
       joined.value = true
+      // Scroll to bottom after messages are rendered
+      nextTick(() => {
+        scrollToBottom()
+      })
     } else {
       // User needs to set nickname
       needsNickname.value = true
@@ -232,6 +277,11 @@ const setNickname = async () => {
     // Mark as fully joined
     needsNickname.value = false
     joined.value = true
+
+    // Scroll to bottom after UI update
+    nextTick(() => {
+      scrollToBottom()
+    })
   } catch (err: any) {
     console.error('Failed to set nickname:', err)
     error.value = err.message || 'Failed to set nickname'
@@ -250,4 +300,21 @@ onMounted(() => {
 
   attemptJoinGroup()
 })
+
+// Utility function to format message timestamp
+const formatMessageTime = (dateString: string) => {
+  const date = new Date(dateString)
+  return date.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  })
+}
+
+// Scroll to bottom of messages when new messages arrive
+const scrollToBottom = () => {
+  if (messagesContainer.value) {
+    messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+  }
+}
 </script>

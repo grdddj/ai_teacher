@@ -53,7 +53,6 @@ export interface JoinGroupResponse {
   }
   messages: Array<{
     id: string
-    deviceId: string
     content: string
     createdAt: string
   }>
