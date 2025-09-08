@@ -19,3 +19,18 @@ bun lint
 bun lint:fix
 bun format
 ```
+
+## Deployment
+
+```bash
+bun run build
+bun run preview
+
+node .output/server/index.mjs
+
+bun run build
+npm install -g pm2
+pm2 start .output/server/index.mjs --name "scio-app"
+pm2 save
+pm2 startup
+```
