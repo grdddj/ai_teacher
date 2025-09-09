@@ -571,7 +571,14 @@ const latestCompletion = computed(() => {
     .filter((msg) => msg.source === MessageSource.System && msg.completion !== undefined)
     .reverse()
 
-  if (systemMessages.length === 0) return null
+  // If no evaluation messages yet, show 0% progress
+  if (systemMessages.length === 0) {
+    return {
+      completion: 0,
+      goals: [],
+      hasMultipleGoals: false,
+    }
+  }
 
   const latest = systemMessages[0]
   if (!latest) return null
