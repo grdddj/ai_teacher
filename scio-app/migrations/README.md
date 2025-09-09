@@ -32,5 +32,6 @@ This migration adds message source tracking to distinguish between user and syst
 - Updates existing evaluation messages (with completion NOT NULL) to have source='system'
 
 The `source` field helps distinguish:
+
 - `'user'` for messages sent by students
 - `'system'` for AI evaluation messages and system notifications

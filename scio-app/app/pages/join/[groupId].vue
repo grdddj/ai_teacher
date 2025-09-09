@@ -2,12 +2,12 @@
   <div class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
     <!-- Header -->
     <div class="bg-white shadow-sm border-b border-slate-200">
-      <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div class="max-w-2xl lg:max-w-4xl xl:max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <h1 class="text-2xl font-bold text-slate-900 text-center">Join Group</h1>
       </div>
     </div>
 
-    <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="max-w-2xl lg:max-w-4xl xl:max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <!-- Loading State -->
       <div v-if="pending" class="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
         <div class="flex items-center justify-center">
@@ -110,8 +110,81 @@
         <!-- Chat Header -->
         <div class="bg-slate-50 border-b border-slate-200 p-4">
           <div class="flex items-center justify-between">
-            <div>
-              <h2 class="text-lg font-semibold text-slate-900">{{ joinData?.group?.name }}</h2>
+            <div class="flex-1">
+              <div class="flex items-center gap-3 mb-1">
+                <h2 class="text-lg font-semibold text-slate-900">{{ joinData?.group?.name }}</h2>
+                <!-- Progress Indicator -->
+                <div v-if="latestCompletion" class="flex items-center gap-2">
+                  <!-- Single Goal Checkmark -->
+                  <div v-if="!latestCompletion.hasMultipleGoals" class="flex items-center">
+                    <svg
+                      v-if="latestCompletion.completion === 100"
+                      class="w-5 h-5 text-green-600"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fill-rule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                        clip-rule="evenodd"
+                      />
+                    </svg>
+                    <svg
+                      v-else
+                      class="w-5 h-5"
+                      :class="{
+                        'text-red-500': getProgressColor(latestCompletion.completion) === 'red',
+                        'text-yellow-500':
+                          getProgressColor(latestCompletion.completion) === 'yellow',
+                        'text-green-500': getProgressColor(latestCompletion.completion) === 'green',
+                      }"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle cx="12" cy="12" r="10" stroke-width="2" />
+                    </svg>
+                    <span
+                      class="text-sm font-medium ml-1"
+                      :class="{
+                        'text-red-600': getProgressColor(latestCompletion.completion) === 'red',
+                        'text-yellow-600':
+                          getProgressColor(latestCompletion.completion) === 'yellow',
+                        'text-green-600': getProgressColor(latestCompletion.completion) === 'green',
+                      }"
+                    >
+                      {{ latestCompletion.completion }}%
+                    </span>
+                  </div>
+
+                  <!-- Multiple Goals Progress Bar -->
+                  <div v-else class="flex items-center gap-2">
+                    <div class="w-16 bg-gray-200 rounded-full h-2">
+                      <div
+                        class="h-2 rounded-full transition-all duration-300"
+                        :class="{
+                          'bg-red-500': getProgressColor(latestCompletion.completion) === 'red',
+                          'bg-yellow-500':
+                            getProgressColor(latestCompletion.completion) === 'yellow',
+                          'bg-green-500': getProgressColor(latestCompletion.completion) === 'green',
+                        }"
+                        :style="{ width: `${latestCompletion.completion}%` }"
+                      ></div>
+                    </div>
+                    <span
+                      class="text-sm font-medium"
+                      :class="{
+                        'text-red-600': getProgressColor(latestCompletion.completion) === 'red',
+                        'text-yellow-600':
+                          getProgressColor(latestCompletion.completion) === 'yellow',
+                        'text-green-600': getProgressColor(latestCompletion.completion) === 'green',
+                      }"
+                    >
+                      {{ latestCompletion.completion }}%
+                    </span>
+                  </div>
+                </div>
+              </div>
               <p class="text-sm text-slate-600">Welcome, {{ joinData?.deviceNickname }}!</p>
             </div>
             <div class="flex items-center text-green-600">
@@ -487,5 +560,33 @@ const scrollToBottom = () => {
   if (messagesContainer.value) {
     messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
   }
+}
+
+// Get the latest goal completion from system messages
+const latestCompletion = computed(() => {
+  if (!joinData.value?.messages) return null
+
+  // Find the most recent system message with completion data
+  const systemMessages = joinData.value.messages
+    .filter((msg) => msg.source === MessageSource.System && msg.completion !== undefined)
+    .reverse()
+
+  if (systemMessages.length === 0) return null
+
+  const latest = systemMessages[0]
+  if (!latest) return null
+
+  return {
+    completion: latest.completion || 0,
+    goals: latest.goals || [],
+    hasMultipleGoals: (latest.goals && latest.goals.length > 1) || false,
+  }
+})
+
+// Get progress color based on completion percentage
+const getProgressColor = (completion: number) => {
+  if (completion >= 67) return 'green'
+  if (completion >= 34) return 'yellow'
+  return 'red'
 }
 </script>
