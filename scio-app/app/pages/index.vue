@@ -580,12 +580,15 @@ const updateStudentRow = (deviceId: string, groupId: string, updates: Partial<St
   // Set flag to prevent watcher conflicts
   isUpdatingFromWebSocket = true
 
+  // Remove the student from current position and add to top
+  const newStudents = [...dashboardData.value.students]
+  newStudents.splice(studentIndex, 1) // Remove from current position
+  newStudents.unshift(updatedStudent) // Add to top
+
   // Create a completely new dashboard data object to ensure reactivity
   const newDashboardData = {
     ...dashboardData.value,
-    students: dashboardData.value.students.map((student, index) =>
-      index === studentIndex ? updatedStudent : student
-    ),
+    students: newStudents,
   }
 
   // Update the entire dashboard data
