@@ -247,7 +247,7 @@
             </thead>
             <tbody class="bg-white divide-y divide-slate-200">
               <template
-                v-for="student in dashboardData.students"
+                v-for="student in dashboardData?.students || []"
                 :key="`${student.deviceId}-${student.groupId}`"
               >
                 <!-- Main Row -->
@@ -399,10 +399,16 @@ const {
 // Create a reactive copy that we can mutate
 const dashboardData = ref<DashboardData | null>(null)
 
-// Initialize and watch for changes
-watchEffect(() => {
-  if (fetchedDashboardData.value) {
-    dashboardData.value = JSON.parse(JSON.stringify(fetchedDashboardData.value))
+// Initialize with fetched data
+if (fetchedDashboardData.value) {
+  dashboardData.value = JSON.parse(JSON.stringify(fetchedDashboardData.value))
+}
+
+// Watch for changes in fetched data (only when it's a fresh fetch, not our updates)
+let isUpdatingFromWebSocket = false
+watch(fetchedDashboardData, (newData) => {
+  if (newData && !isUpdatingFromWebSocket) {
+    dashboardData.value = JSON.parse(JSON.stringify(newData))
   }
 })
 
@@ -419,6 +425,7 @@ const expandedRows = ref(new Set<string>())
 
 // Track recently updated rows for visual feedback
 const recentlyUpdatedRows = ref(new Set<string>())
+const highlightTimeouts = new Map<string, NodeJS.Timeout>()
 
 // Computed values for summary stats
 const averageCompletion = computed(() => {
@@ -446,9 +453,32 @@ const getInitials = (name: string | null): string => {
     .slice(0, 2)
 }
 
+// Client-side reactive time for avoiding hydration mismatches
+const currentTime = ref(new Date())
+
+// Update current time every minute to keep relative times fresh
+let timeInterval: NodeJS.Timeout
+onMounted(() => {
+  timeInterval = setInterval(() => {
+    currentTime.value = new Date()
+  }, 60000) // Update every minute
+})
+
+// Moved to single onUnmounted hook below
+
 const formatRelativeTime = (dateString: string): string => {
+  // For SSR compatibility, return a simple format initially
+  if (typeof window === 'undefined') {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
   const date = new Date(dateString)
-  const now = new Date()
+  const now = currentTime.value
   const diffMs = now.getTime() - date.getTime()
   const diffMins = Math.floor(diffMs / (1000 * 60))
   const diffHours = Math.floor(diffMins / 60)
@@ -483,16 +513,26 @@ const toggleStudentDetails = (deviceId: string, groupId: string) => {
 // Helper function to highlight a row temporarily
 const highlightRow = (deviceId: string, groupId: string) => {
   const key = `${deviceId}-${groupId}`
+
+  // Clear existing timeout if any
+  const existingTimeout = highlightTimeouts.get(key)
+  if (existingTimeout) {
+    clearTimeout(existingTimeout)
+  }
+
   const newSet = new Set(recentlyUpdatedRows.value)
   newSet.add(key)
   recentlyUpdatedRows.value = newSet
 
   // Remove highlight after 10 seconds
-  setTimeout(() => {
+  const timeout = setTimeout(() => {
     const currentSet = new Set(recentlyUpdatedRows.value)
     currentSet.delete(key)
     recentlyUpdatedRows.value = currentSet
+    highlightTimeouts.delete(key)
   }, 10000)
+
+  highlightTimeouts.set(key, timeout)
 }
 
 // Helper functions for selective updates
@@ -512,6 +552,9 @@ const updateStudentRow = (deviceId: string, groupId: string, updates: Partial<St
   const originalStudent = dashboardData.value.students[studentIndex]
   const updatedStudent = { ...originalStudent, ...updates } as StudentProgress
 
+  // Set flag to prevent watcher conflicts
+  isUpdatingFromWebSocket = true
+
   // Create a completely new dashboard data object to ensure reactivity
   const newDashboardData = {
     ...dashboardData.value,
@@ -522,6 +565,11 @@ const updateStudentRow = (deviceId: string, groupId: string, updates: Partial<St
 
   // Update the entire dashboard data
   dashboardData.value = newDashboardData
+
+  // Reset flag after a short delay
+  nextTick(() => {
+    isUpdatingFromWebSocket = false
+  })
 
   // Highlight the updated row
   highlightRow(deviceId, groupId)
@@ -536,6 +584,9 @@ const addNewStudent = async (studentData: any) => {
     )
 
     if (newStudent && dashboardData.value?.students) {
+      // Set flag to prevent watcher conflicts
+      isUpdatingFromWebSocket = true
+
       // Add to the beginning of the array (top of table)
       dashboardData.value.students.unshift(newStudent)
       dashboardData.value.totalStudents = dashboardData.value.students.length
@@ -543,6 +594,11 @@ const addNewStudent = async (studentData: any) => {
       // Update active groups count
       const uniqueGroups = new Set(dashboardData.value.students.map((s) => s.groupId))
       dashboardData.value.activeGroups = uniqueGroups.size
+
+      // Reset flag after a short delay
+      nextTick(() => {
+        isUpdatingFromWebSocket = false
+      })
 
       // Highlight the new student row
       highlightRow(newStudent.deviceId, newStudent.groupId)
@@ -635,9 +691,21 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  // Clear time interval
+  if (timeInterval) {
+    clearInterval(timeInterval)
+  }
+
+  // Close WebSocket connection
   if (ws.value) {
     ws.value.close()
     ws.value = null
   }
+
+  // Clear all highlight timeouts
+  highlightTimeouts.forEach((timeout) => {
+    clearTimeout(timeout)
+  })
+  highlightTimeouts.clear()
 })
 </script>
