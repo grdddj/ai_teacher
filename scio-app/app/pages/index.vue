@@ -251,7 +251,17 @@
                 :key="`${student.deviceId}-${student.groupId}`"
               >
                 <!-- Main Row -->
-                <tr class="hover:bg-slate-50 transition-colors">
+                <tr
+                  class="transition-colors duration-500"
+                  :class="{
+                    'bg-orange-50 hover:bg-orange-100': recentlyUpdatedRows.has(
+                      `${student.deviceId}-${student.groupId}`
+                    ),
+                    'hover:bg-slate-50': !recentlyUpdatedRows.has(
+                      `${student.deviceId}-${student.groupId}`
+                    ),
+                  }"
+                >
                   <td class="px-6 py-4 whitespace-nowrap">
                     <div class="flex items-center">
                       <div
@@ -407,6 +417,9 @@ const customRefreshDashboard = async () => {
 // Track expanded rows
 const expandedRows = ref(new Set<string>())
 
+// Track recently updated rows for visual feedback
+const recentlyUpdatedRows = ref(new Set<string>())
+
 // Computed values for summary stats
 const averageCompletion = computed(() => {
   if (!dashboardData.value?.students?.length) return 0
@@ -467,6 +480,21 @@ const toggleStudentDetails = (deviceId: string, groupId: string) => {
   expandedRows.value = newSet
 }
 
+// Helper function to highlight a row temporarily
+const highlightRow = (deviceId: string, groupId: string) => {
+  const key = `${deviceId}-${groupId}`
+  const newSet = new Set(recentlyUpdatedRows.value)
+  newSet.add(key)
+  recentlyUpdatedRows.value = newSet
+
+  // Remove highlight after 10 seconds
+  setTimeout(() => {
+    const currentSet = new Set(recentlyUpdatedRows.value)
+    currentSet.delete(key)
+    recentlyUpdatedRows.value = currentSet
+  }, 10000)
+}
+
 // Helper functions for selective updates
 const findStudentIndex = (deviceId: string, groupId: string): number => {
   if (!dashboardData.value?.students) return -1
@@ -494,6 +522,9 @@ const updateStudentRow = (deviceId: string, groupId: string, updates: Partial<St
 
   // Update the entire dashboard data
   dashboardData.value = newDashboardData
+
+  // Highlight the updated row
+  highlightRow(deviceId, groupId)
 }
 
 const addNewStudent = async (studentData: any) => {
@@ -512,6 +543,9 @@ const addNewStudent = async (studentData: any) => {
       // Update active groups count
       const uniqueGroups = new Set(dashboardData.value.students.map((s) => s.groupId))
       dashboardData.value.activeGroups = uniqueGroups.size
+
+      // Highlight the new student row
+      highlightRow(newStudent.deviceId, newStudent.groupId)
     }
   } catch (error) {
     console.error('Failed to fetch new student data:', error)
