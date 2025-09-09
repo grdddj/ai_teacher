@@ -34,3 +34,7 @@ pm2 start .output/server/index.mjs --name "scio-app"
 pm2 save
 pm2 startup
 ```
+
+## Next steps/features/ideas
+
+- teacher should try to experiment a little bit in each new group, to see how it reacts on good/bad answers, and he might be able to supply some additional context to the AI model for this group's goal evaluation

@@ -1,4 +1,4 @@
-import { pgTable, uuid, varchar, text, timestamp } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, varchar, text, timestamp, integer } from 'drizzle-orm/pg-core'
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod'
 import type { InferInsertModel, InferSelectModel } from 'drizzle-orm'
 
@@ -37,6 +37,8 @@ export const group_messages = pgTable('group_messages', {
     .notNull()
     .references(() => devices.id),
   content: text('content').notNull(),
+  source: varchar('source', { length: 10 }).notNull().default('user'),
+  completion: integer('completion'),
   created_at: timestamp('created_at').defaultNow().notNull(),
 })
 

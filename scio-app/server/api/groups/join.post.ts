@@ -104,12 +104,11 @@ export default defineEventHandler(async (event): Promise<JoinGroupResponse> => {
       throw membershipError
     }
 
-    // Get messages for this specific device only
+    // Get all messages for this group
     const { data: messages, error: messagesError } = await supabase
       .from('group_messages')
-      .select('id, content, created_at')
+      .select('id, content, created_at, source, completion')
       .eq('group_id', groupId)
-      .eq('device_id', finalDeviceId)
       .order('created_at', { ascending: true })
 
     if (messagesError) {
@@ -145,12 +144,13 @@ export default defineEventHandler(async (event): Promise<JoinGroupResponse> => {
           createdAt: new Date().toISOString(),
           source: MessageSource.System,
         },
-        // Add user's messages
+        // Add all messages from the database
         ...(messages || []).map((msg: any) => ({
           id: msg.id,
           content: msg.content,
           createdAt: msg.created_at,
-          source: MessageSource.User,
+          source: msg.source === 'system' ? MessageSource.System : MessageSource.User,
+          completion: msg.completion,
         })),
       ],
       timestamp: new Date().toISOString(),

@@ -46,6 +46,8 @@ export interface Message {
   content: string
   createdAt: string
   source: MessageSource
+  completion?: number
+  goals?: Array<{ goal: string; completed: boolean }>
 }
 
 export interface JoinGroupRequest {
@@ -87,6 +89,6 @@ export interface SendMessageRequest {
 
 export interface SendMessageResponse {
   success: boolean
-  message: Message
+  messages: Message[]
   timestamp: string
 }

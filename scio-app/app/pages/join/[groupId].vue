@@ -135,9 +135,37 @@
             <!-- System Message -->
             <div
               v-if="message.source === MessageSource.System"
-              class="max-w-md mx-auto px-4 py-3 rounded-lg text-sm bg-blue-50 text-blue-800 border border-blue-200 text-center"
+              class="max-w-md mx-auto px-4 py-3 rounded-lg text-sm border text-center"
+              :class="{
+                'bg-blue-50 text-blue-800 border-blue-200': !message.completion,
+                'bg-green-50 text-green-800 border-green-200':
+                  message.completion && message.completion >= 67,
+                'bg-yellow-50 text-yellow-800 border-yellow-200':
+                  message.completion && message.completion >= 34 && message.completion < 67,
+                'bg-red-50 text-red-800 border-red-200':
+                  message.completion && message.completion < 34,
+              }"
             >
-              <div class="flex items-center justify-center mb-2">
+              <!-- Progress Bar for Evaluation Messages -->
+              <div v-if="message.completion !== undefined" class="mb-3">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="font-medium text-xs">PROGRESS</span>
+                  <span class="font-bold text-lg">{{ message.completion }}%</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                  <div
+                    class="h-full transition-all duration-500 ease-out rounded-full"
+                    :class="{
+                      'bg-green-500': message.completion >= 67,
+                      'bg-yellow-500': message.completion >= 34 && message.completion < 67,
+                      'bg-red-500': message.completion < 34,
+                    }"
+                    :style="{ width: `${message.completion}%` }"
+                  ></div>
+                </div>
+              </div>
+              <!-- Goal Icon for Welcome Message -->
+              <div v-else class="flex items-center justify-center mb-2">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     stroke-linecap="round"
@@ -149,6 +177,39 @@
                 <span class="font-medium text-xs">GOAL</span>
               </div>
               <div class="leading-relaxed">{{ message.content }}</div>
+              <!-- Show individual goals if available -->
+              <div v-if="message.goals && message.goals.length > 0" class="mt-3 space-y-1">
+                <div
+                  v-for="(goal, index) in message.goals"
+                  :key="index"
+                  class="flex items-center text-xs"
+                >
+                  <svg
+                    v-if="goal.completed"
+                    class="w-4 h-4 mr-1 text-green-600"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                  <svg
+                    v-else
+                    class="w-4 h-4 mr-1 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle cx="12" cy="12" r="10" stroke-width="2" />
+                  </svg>
+                  <span :class="{ 'line-through opacity-60': goal.completed }">
+                    {{ goal.goal }}
+                  </span>
+                </div>
+              </div>
               <div class="text-xs mt-2 opacity-70 text-blue-600">
                 {{ formatMessageTime(message.createdAt) }}
               </div>
@@ -226,7 +287,7 @@
                   d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
                 />
               </svg>
-              <span class="ml-2">{{ sendingMessage ? 'Sending...' : 'Send' }}</span>
+              <span class="ml-2">{{ sendingMessage ? 'Evaluating progress...' : 'Send' }}</span>
             </button>
           </form>
         </div>
@@ -391,9 +452,9 @@ const sendMessage = async () => {
       body: requestBody,
     })
 
-    // Add the new message to the local messages array
-    if (joinData.value && response.message) {
-      joinData.value.messages.push(response.message)
+    // Add all returned messages to the local messages array
+    if (joinData.value && response.messages) {
+      joinData.value.messages.push(...response.messages)
     }
 
     // Clear the input
