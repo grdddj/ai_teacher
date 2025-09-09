@@ -2,6 +2,7 @@ import { supabase } from '../../database'
 import type { JoinGroupRequest, JoinGroupResponse } from '../../../types/api'
 import { MessageSource } from '../../../types/api'
 import { randomUUID } from 'crypto'
+import { broadcastDashboardEvent } from '../../routes/_ws'
 
 export default defineEventHandler(async (event): Promise<JoinGroupResponse> => {
   try {
@@ -91,6 +92,7 @@ export default defineEventHandler(async (event): Promise<JoinGroupResponse> => {
       .single()
 
     // If not a member, add to group and create welcome message
+    let isNewMember = false
     if (membershipError && membershipError.code === 'PGRST116') {
       const { error: joinError } = await supabase.from('group_members').insert({
         group_id: groupId,
@@ -100,6 +102,8 @@ export default defineEventHandler(async (event): Promise<JoinGroupResponse> => {
       if (joinError) {
         throw joinError
       }
+
+      isNewMember = true
     } else if (membershipError) {
       throw membershipError
     }
@@ -125,6 +129,24 @@ export default defineEventHandler(async (event): Promise<JoinGroupResponse> => {
 
     if (deviceInfoError) {
       throw deviceInfoError
+    }
+
+    // Broadcast student join event if this is a new member
+    if (isNewMember) {
+      try {
+        broadcastDashboardEvent({
+          type: 'student_joined',
+          data: {
+            deviceId: finalDeviceId,
+            groupId: groupId,
+            nickname: deviceInfo.nickname,
+            groupName: group.name,
+            timestamp: new Date().toISOString(),
+          },
+        })
+      } catch (error) {
+        console.error('Failed to broadcast student join event:', error)
+      }
     }
 
     // Return response

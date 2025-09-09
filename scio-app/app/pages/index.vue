@@ -449,17 +449,65 @@ const toggleStudentDetails = (deviceId: string, groupId: string) => {
   expandedRows.value = newSet
 }
 
-// Auto-refresh every 30 seconds
-let refreshInterval: NodeJS.Timeout
+// WebSocket connection for real-time updates
+const ws = ref<WebSocket | null>(null)
+
+const connectWebSocket = () => {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const wsUrl = `${protocol}//${window.location.host}/_ws`
+
+  ws.value = new WebSocket(wsUrl)
+
+  ws.value.onopen = () => {
+    console.log('[Dashboard] WebSocket connected')
+    // Subscribe to dashboard updates
+    ws.value?.send(JSON.stringify({ type: 'subscribe_dashboard' }))
+  }
+
+  ws.value.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data)
+      console.log('[Dashboard] WebSocket message:', data)
+
+      switch (data.type) {
+        case 'student_joined':
+        case 'message_sent':
+        case 'progress_updated':
+          // Refresh dashboard data when any relevant event occurs
+          console.log('[Dashboard] Refreshing data due to:', data.type)
+          refreshDashboard()
+          break
+        case 'connection':
+        case 'subscribed':
+          console.log('[Dashboard]', data.message)
+          break
+        case 'error':
+          console.error('[Dashboard] WebSocket error:', data.message)
+          break
+      }
+    } catch (error) {
+      console.error('[Dashboard] Error parsing WebSocket message:', error)
+    }
+  }
+
+  ws.value.onclose = () => {
+    console.log('[Dashboard] WebSocket disconnected, attempting to reconnect in 3 seconds...')
+    setTimeout(connectWebSocket, 3000)
+  }
+
+  ws.value.onerror = (error) => {
+    console.error('[Dashboard] WebSocket error:', error)
+  }
+}
+
 onMounted(() => {
-  refreshInterval = setInterval(() => {
-    refreshDashboard()
-  }, 30000)
+  connectWebSocket()
 })
 
 onUnmounted(() => {
-  if (refreshInterval) {
-    clearInterval(refreshInterval)
+  if (ws.value) {
+    ws.value.close()
+    ws.value = null
   }
 })
 </script>

@@ -2,6 +2,7 @@ import { supabase } from '../../database'
 import type { SendMessageRequest, SendMessageResponse, Message } from '../../../types/api'
 import { MessageSource } from '../../../types/api'
 import { analyzeGoalCompletion } from '../../utils/analyzeGoalCompletion'
+import { broadcastDashboardEvent } from '../../routes/_ws'
 
 export default defineEventHandler(async (event): Promise<SendMessageResponse> => {
   try {
@@ -66,6 +67,21 @@ export default defineEventHandler(async (event): Promise<SendMessageResponse> =>
         source: MessageSource.User,
       },
     ]
+
+    // Broadcast message sent event via WebSocket
+    try {
+      broadcastDashboardEvent({
+        type: 'message_sent',
+        data: {
+          deviceId,
+          groupId,
+          messageId: newMessage.id,
+          timestamp: newMessage.created_at,
+        },
+      })
+    } catch (error) {
+      console.error('Failed to broadcast message event:', error)
+    }
 
     // Get group details for goal description
     const { data: group, error: groupError } = await supabase
@@ -154,6 +170,21 @@ export default defineEventHandler(async (event): Promise<SendMessageResponse> =>
           completion: evalMessage.completion,
           goals: analysisResult.goals,
         })
+
+        // Broadcast progress update event via WebSocket
+        try {
+          broadcastDashboardEvent({
+            type: 'progress_updated',
+            data: {
+              deviceId,
+              groupId,
+              completion: analysisResult.completion,
+              timestamp: evalMessage.created_at,
+            },
+          })
+        } catch (error) {
+          console.error('Failed to broadcast progress event:', error)
+        }
       }
     } catch (analysisError) {
       console.error('Goal analysis failed:', analysisError)
