@@ -291,8 +291,17 @@
             <!-- User Message -->
             <div
               v-else
-              class="max-w-xs lg:max-w-md px-4 py-2 rounded-lg text-sm bg-blue-500 text-white"
+              class="max-w-xs lg:max-w-md px-4 py-2 rounded-lg text-sm bg-blue-500 text-white relative"
+              :class="{
+                'ring-4 ring-green-400 ring-offset-2': helpfulMessages.has(message.id),
+              }"
             >
+              <!-- Helpful message indicator -->
+              <div
+                v-if="helpfulMessages.has(message.id)"
+                class="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white"
+                title="This message helped solve the problem!"
+              ></div>
               <div>{{ message.content }}</div>
               <div class="text-xs mt-1 opacity-70 text-blue-100">
                 {{ formatMessageTime(message.createdAt) }}
@@ -596,4 +605,46 @@ const getProgressColor = (completion: number) => {
   if (completion >= 34) return 'yellow'
   return 'red'
 }
+
+// Get messages that helped increase completion (contributed to progress)
+const helpfulMessages = computed(() => {
+  if (!joinData.value?.messages) return new Set()
+
+  const messages = joinData.value.messages
+  const helpful = new Set<string>()
+  let lastCompletion = 0
+
+  for (let i = 0; i < messages.length; i++) {
+    const message = messages[i]
+    if (!message) continue
+
+    // Check if this is a system message with completion data
+    if (message.source === MessageSource.System && message.completion !== undefined) {
+      const currentCompletion = message.completion
+
+      // If completion increased, mark the previous user message(s) as helpful
+      if (currentCompletion > lastCompletion) {
+        // Look backwards for recent user messages that might have contributed
+        for (let j = i - 1; j >= 0; j--) {
+          const prevMessage = messages[j]
+          if (!prevMessage) continue
+
+          // Stop at the previous system message with completion
+          if (prevMessage.source === MessageSource.System && prevMessage.completion !== undefined) {
+            break
+          }
+
+          // Mark user messages as helpful
+          if (prevMessage.source === MessageSource.User) {
+            helpful.add(prevMessage.id)
+          }
+        }
+      }
+
+      lastCompletion = currentCompletion
+    }
+  }
+
+  return helpful
+})
 </script>
