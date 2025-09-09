@@ -375,7 +375,8 @@
 </template>
 
 <script setup lang="ts">
-import type { StudentProgress, DashboardData } from '../../server/api/dashboard/students.get'
+import type { DashboardData } from '../../server/api/dashboard/students.get'
+import StudentDetails from '../../components/StudentDetails.vue'
 
 // Fetch dashboard data
 const {

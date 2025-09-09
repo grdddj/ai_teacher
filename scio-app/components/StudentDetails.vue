@@ -102,22 +102,50 @@
         </div>
       </div>
 
-      <!-- Goal Description -->
+      <!-- Goal Description and Progress -->
       <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
-        <h4 class="text-sm font-semibold text-blue-800 mb-2">Goal</h4>
-        <p class="text-sm text-blue-700">{{ data.groupDescription }}</p>
+        <div class="flex items-center justify-between mb-3">
+          <div>
+            <h4 class="text-sm font-semibold text-blue-800 mb-1">Goal</h4>
+            <p class="text-sm text-blue-700">{{ data.groupDescription }}</p>
+          </div>
+          <div class="text-right">
+            <div class="text-2xl font-bold text-blue-800">{{ data.currentCompletion }}%</div>
+            <div class="text-xs text-blue-600 uppercase tracking-wider">Progress</div>
+          </div>
+        </div>
+        <div class="w-full bg-blue-200 rounded-full h-2">
+          <div
+            class="h-2 rounded-full transition-all duration-500"
+            :class="{
+              'bg-green-500': data.currentCompletion >= 67,
+              'bg-yellow-500': data.currentCompletion >= 34 && data.currentCompletion < 67,
+              'bg-red-500': data.currentCompletion < 34,
+            }"
+            :style="{ width: `${data.currentCompletion}%` }"
+          ></div>
+        </div>
       </div>
 
       <!-- Messages History -->
       <div>
-        <h4 class="text-sm font-semibold text-slate-700 mb-3">Conversation History</h4>
+        <div class="flex items-center justify-between mb-3">
+          <h4 class="text-sm font-semibold text-slate-700">Student Messages</h4>
+          <div class="flex items-center text-xs text-slate-500">
+            <div class="flex items-center mr-4">
+              <div class="w-3 h-3 bg-green-400 rounded-full mr-1"></div>
+              <span>Helpful for goal</span>
+            </div>
+            <span>{{ userMessages.length }} messages</span>
+          </div>
+        </div>
 
         <div
-          v-if="!data.messages || data.messages.length === 0"
-          class="text-center py-6 text-slate-500"
+          v-if="!userMessages || userMessages.length === 0"
+          class="text-center py-8 text-slate-500"
         >
           <svg
-            class="w-12 h-12 mx-auto mb-2 text-slate-300"
+            class="w-16 h-16 mx-auto mb-3 text-slate-300"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -129,66 +157,62 @@
               d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
             />
           </svg>
-          <p class="text-sm">No messages yet</p>
+          <p class="text-base font-medium">No messages yet</p>
+          <p class="text-sm mt-1">
+            The conversation will appear here once the student starts chatting
+          </p>
         </div>
 
-        <div
-          v-else
-          class="max-h-64 overflow-y-auto space-y-3 border border-slate-200 rounded-lg p-4"
-        >
-          <div
-            v-for="message in data.messages"
-            :key="message.id"
-            class="flex"
-            :class="{
-              'justify-center': message.source === MessageSource.System,
-              'justify-end': message.source === MessageSource.User,
-            }"
-          >
-            <!-- System Message -->
-            <div
-              v-if="message.source === MessageSource.System"
-              class="max-w-md mx-auto px-3 py-2 rounded-lg text-xs border text-center"
-              :class="{
-                'bg-blue-50 text-blue-800 border-blue-200': !message.completion,
-                'bg-green-50 text-green-800 border-green-200':
-                  message.completion && message.completion >= 67,
-                'bg-yellow-50 text-yellow-800 border-yellow-200':
-                  message.completion && message.completion >= 34 && message.completion < 67,
-                'bg-red-50 text-red-800 border-red-200':
-                  message.completion && message.completion < 34,
-              }"
-            >
-              <!-- Progress indicator for evaluation messages -->
-              <div v-if="message.completion !== undefined" class="mb-2">
-                <div class="flex items-center justify-between mb-1">
-                  <span class="font-medium text-xs">PROGRESS</span>
-                  <span class="font-bold">{{ message.completion }}%</span>
+        <div v-else class="space-y-2">
+          <!-- Only user messages displayed in chronological order -->
+          <div v-for="message in userMessages" :key="message.id" class="group relative">
+            <div class="flex items-start space-x-3 py-2">
+              <!-- Student Avatar -->
+              <div class="flex-shrink-0">
+                <div class="w-8 h-8 bg-slate-300 rounded-full flex items-center justify-center">
+                  <span class="text-xs font-medium text-slate-700">
+                    {{ getInitials(data.nickname) }}
+                  </span>
                 </div>
-                <div class="w-full bg-gray-200 rounded-full h-2">
+              </div>
+
+              <!-- Message Content -->
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center space-x-2">
+                  <p class="text-sm font-medium text-slate-900">
+                    {{ data.nickname || 'Anonymous' }}
+                  </p>
+                  <p class="text-xs text-slate-500">
+                    {{ formatMessageTime(message.createdAt) }}
+                  </p>
+                  <!-- Helpful message indicator -->
                   <div
-                    class="h-2 rounded-full transition-all duration-300"
-                    :class="{
-                      'bg-green-500': message.completion >= 67,
-                      'bg-yellow-500': message.completion >= 34 && message.completion < 67,
-                      'bg-red-500': message.completion < 34,
-                    }"
-                    :style="{ width: `${message.completion}%` }"
-                  ></div>
+                    v-if="message.contributedToGoal"
+                    class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"
+                    title="This message helped solve the goal"
+                  >
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                    Helpful
+                  </div>
                 </div>
-              </div>
 
-              <div class="leading-tight">{{ message.content }}</div>
-              <div class="text-xs mt-1 opacity-70">
-                {{ formatMessageTime(message.createdAt) }}
-              </div>
-            </div>
-
-            <!-- User Message -->
-            <div v-else class="max-w-xs px-3 py-2 rounded-lg text-xs bg-blue-500 text-white">
-              <div>{{ message.content }}</div>
-              <div class="text-xs mt-1 opacity-70">
-                {{ formatMessageTime(message.createdAt) }}
+                <!-- Message text with helpful highlighting -->
+                <div
+                  class="mt-1 text-sm text-slate-700 p-3 rounded-lg"
+                  :class="{
+                    'bg-green-50 border-l-4 border-green-400': message.contributedToGoal,
+                    'bg-slate-50': !message.contributedToGoal,
+                  }"
+                >
+                  {{ message.content }}
+                </div>
               </div>
             </div>
           </div>
@@ -199,7 +223,7 @@
       <div class="flex justify-between items-center pt-4 border-t border-slate-200">
         <div class="text-xs text-slate-500">
           Last updated:
-          {{ formatDate(data.messages?.[data.messages.length - 1]?.createdAt || data.joinedAt) }}
+          {{ formatDate(userMessages[userMessages.length - 1]?.createdAt || data.joinedAt) }}
         </div>
 
         <div class="flex gap-2">
@@ -224,8 +248,8 @@
 </template>
 
 <script setup lang="ts">
-import type { StudentDetail } from '../../server/api/dashboard/student/[deviceId]/[groupId].get'
-import { MessageSource } from '../../types/api'
+import type { StudentDetail } from '../server/api/dashboard/student/[deviceId]/[groupId].get'
+import { MessageSource } from '../types/api'
 
 // Props
 const props = defineProps<{
@@ -246,6 +270,14 @@ const {
   refresh: refreshDetails,
 } = await useFetch<StudentDetail>(`/api/dashboard/student/${props.deviceId}/${props.groupId}`)
 
+// Computed property to get user messages only, sorted chronologically
+const userMessages = computed(() => {
+  if (!data.value?.messages) return []
+  return [...data.value.messages]
+    .filter((message) => message.source === MessageSource.User)
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+})
+
 // Helper functions
 const formatDate = (dateString: string) => {
   return new Date(dateString).toLocaleDateString('en-US', {
@@ -263,5 +295,15 @@ const formatMessageTime = (dateString: string) => {
     minute: '2-digit',
     hour12: true,
   })
+}
+
+const getInitials = (name: string | null): string => {
+  if (!name) return '?'
+  return name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
 }
 </script>
