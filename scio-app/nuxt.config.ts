@@ -11,12 +11,7 @@ export default defineNuxtConfig({
       hmr: {
         clientPort: 3000,
       },
-      allowedHosts: [
-        'localhost',
-        '127.0.0.1',
-        'aiteacher.jirkuvserver.cz',
-        '.jirkuvserver.cz',
-      ],
+      allowedHosts: ['localhost', '127.0.0.1', 'aiteacher.jirkuvserver.cz', '.jirkuvserver.cz'],
     },
   },
   devServer: {
