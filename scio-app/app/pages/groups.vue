@@ -134,20 +134,7 @@
         </div>
 
         <form class="space-y-6" @submit.prevent="createGroup">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label for="owner_id" class="block text-sm font-medium text-slate-700 mb-2">
-                Owner ID
-              </label>
-              <input
-                id="owner_id"
-                v-model="newGroup.owner_id"
-                type="text"
-                placeholder="e.g., teacher_1"
-                required
-                class="w-full px-3 py-2 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-              />
-            </div>
+          <div class="grid grid-cols-1 gap-6">
 
             <div>
               <label for="name" class="block text-sm font-medium text-slate-700 mb-2">
@@ -430,6 +417,17 @@ const {
   refresh: refreshGroups,
 } = await useFetch<GroupsResponse>('/api/groups')
 
+// Get owner ID from deviceId in localStorage, or use "random" as fallback
+const getOwnerIdFromStorage = (): string => {
+  if (import.meta.client) {
+    const deviceId = localStorage.getItem('deviceId')
+    if (deviceId && deviceId.length >= 8) {
+      return deviceId.substring(0, 8)
+    }
+  }
+  return 'random'
+}
+
 // Form data for creating new group
 const newGroup = ref<CreateGroupRequest>({
   owner_id: '',
@@ -449,9 +447,15 @@ const createGroup = async () => {
   createPending.value = true
 
   try {
+    // Automatically set owner_id from deviceId or fallback to "random"
+    const groupData = {
+      ...newGroup.value,
+      owner_id: getOwnerIdFromStorage(),
+    }
+
     const response = await $fetch<CreateGroupResponse>('/api/groups', {
       method: 'POST',
-      body: newGroup.value,
+      body: groupData,
     })
 
     // Clear form
