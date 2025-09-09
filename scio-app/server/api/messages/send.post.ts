@@ -84,11 +84,12 @@ export default defineEventHandler(async (event): Promise<SendMessageResponse> =>
       }
     }
 
-    // Get all messages for this group to analyze progress
+    // Get messages for this group and device to analyze progress
     const { data: allMessages, error: messagesError } = await supabase
       .from('group_messages')
       .select('content, created_at, device_id')
       .eq('group_id', groupId)
+      .eq('device_id', deviceId)
       .order('created_at', { ascending: true })
 
     if (messagesError) {
@@ -102,29 +103,27 @@ export default defineEventHandler(async (event): Promise<SendMessageResponse> =>
     }
 
     try {
-      // Get device nicknames for messages
-      const deviceIds = [...new Set(allMessages.map((m) => m.device_id))]
-      const { data: devices } = await supabase
+      // Get device nickname for the current device
+      const { data: device } = await supabase
         .from('devices')
-        .select('id, nickname')
-        .in('id', deviceIds)
+        .select('nickname')
+        .eq('id', deviceId)
+        .single()
 
-      const deviceMap = new Map(devices?.map((d) => [d.id, d.nickname]) || [])
+      const deviceNickname = device?.nickname || 'Unknown'
 
-      // Format messages for analysis
+      // Format messages for analysis (only from this device)
       const formattedMessages = [
         {
           role: 'system' as const,
           content: `Welcome! Your goal: ${group.description}`,
           timestamp: new Date(),
         },
-        ...allMessages
-          .filter((m) => m.device_id)
-          .map((m) => ({
-            role: 'user' as const,
-            content: `${deviceMap.get(m.device_id) || 'Unknown'}: ${m.content}`,
-            timestamp: new Date(m.created_at),
-          })),
+        ...allMessages.map((m) => ({
+          role: 'user' as const,
+          content: `${deviceNickname}: ${m.content}`,
+          timestamp: new Date(m.created_at),
+        })),
       ]
 
       // Analyze goal completion

@@ -13,7 +13,7 @@ export const groups = pgTable('groups', {
 
 export const devices = pgTable('devices', {
   id: uuid('id').defaultRandom().primaryKey(),
-  nickname: varchar('nickname', { length: 255 }).notNull(),
+  nickname: varchar('nickname', { length: 255 }),
   created_at: timestamp('created_at').defaultNow().notNull(),
 })
 

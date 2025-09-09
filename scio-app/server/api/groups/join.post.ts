@@ -104,11 +104,12 @@ export default defineEventHandler(async (event): Promise<JoinGroupResponse> => {
       throw membershipError
     }
 
-    // Get all messages for this group
+    // Get messages for this group and device
     const { data: messages, error: messagesError } = await supabase
       .from('group_messages')
       .select('id, content, created_at, source, completion')
       .eq('group_id', groupId)
+      .eq('device_id', finalDeviceId)
       .order('created_at', { ascending: true })
 
     if (messagesError) {
