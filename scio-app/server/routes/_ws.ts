@@ -1,5 +1,5 @@
 interface DashboardEvent {
-  type: 'student_joined' | 'message_sent' | 'progress_updated'
+  type: 'student_joined' | 'message_sent' | 'progress_updated' | 'nickname_updated'
   data: any
 }
 

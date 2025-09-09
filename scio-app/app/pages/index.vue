@@ -117,7 +117,7 @@
           <button
             class="inline-flex items-center px-4 py-2 border border-slate-300 text-sm font-medium rounded-lg text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
             :disabled="dashboardPending"
-            @click="refreshDashboard"
+            @click="customRefreshDashboard"
           >
             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -375,16 +375,34 @@
 </template>
 
 <script setup lang="ts">
-import type { DashboardData } from '../../server/api/dashboard/students.get'
+import type { DashboardData, StudentProgress } from '../../server/api/dashboard/students.get'
 import StudentDetails from '../../components/StudentDetails.vue'
 
 // Fetch dashboard data
 const {
-  data: dashboardData,
+  data: fetchedDashboardData,
   pending: dashboardPending,
   error: dashboardError,
   refresh: refreshDashboard,
 } = await useFetch<DashboardData>('/api/dashboard/students')
+
+// Create a reactive copy that we can mutate
+const dashboardData = ref<DashboardData | null>(null)
+
+// Initialize and watch for changes
+watchEffect(() => {
+  if (fetchedDashboardData.value) {
+    dashboardData.value = JSON.parse(JSON.stringify(fetchedDashboardData.value))
+  }
+})
+
+// Create a custom refresh function that updates our reactive copy
+const customRefreshDashboard = async () => {
+  await refreshDashboard()
+  if (fetchedDashboardData.value) {
+    dashboardData.value = JSON.parse(JSON.stringify(fetchedDashboardData.value))
+  }
+}
 
 // Track expanded rows
 const expandedRows = ref(new Set<string>())
@@ -449,6 +467,59 @@ const toggleStudentDetails = (deviceId: string, groupId: string) => {
   expandedRows.value = newSet
 }
 
+// Helper functions for selective updates
+const findStudentIndex = (deviceId: string, groupId: string): number => {
+  if (!dashboardData.value?.students) return -1
+  return dashboardData.value.students.findIndex(
+    (student) => student.deviceId === deviceId && student.groupId === groupId
+  )
+}
+
+const updateStudentRow = (deviceId: string, groupId: string, updates: Partial<StudentProgress>) => {
+  if (!dashboardData.value?.students) return
+
+  const studentIndex = findStudentIndex(deviceId, groupId)
+  if (studentIndex === -1) return
+
+  const originalStudent = dashboardData.value.students[studentIndex]
+  const updatedStudent = { ...originalStudent, ...updates } as StudentProgress
+
+  // Create a completely new dashboard data object to ensure reactivity
+  const newDashboardData = {
+    ...dashboardData.value,
+    students: dashboardData.value.students.map((student, index) =>
+      index === studentIndex ? updatedStudent : student
+    ),
+  }
+
+  // Update the entire dashboard data
+  dashboardData.value = newDashboardData
+}
+
+const addNewStudent = async (studentData: any) => {
+  // Fetch the full student data for the new student
+  try {
+    const response = await $fetch<DashboardData>('/api/dashboard/students')
+    const newStudent = response.students.find(
+      (s) => s.deviceId === studentData.deviceId && s.groupId === studentData.groupId
+    )
+
+    if (newStudent && dashboardData.value?.students) {
+      // Add to the beginning of the array (top of table)
+      dashboardData.value.students.unshift(newStudent)
+      dashboardData.value.totalStudents = dashboardData.value.students.length
+
+      // Update active groups count
+      const uniqueGroups = new Set(dashboardData.value.students.map((s) => s.groupId))
+      dashboardData.value.activeGroups = uniqueGroups.size
+    }
+  } catch (error) {
+    console.error('Failed to fetch new student data:', error)
+    // Fallback to full refresh
+    customRefreshDashboard()
+  }
+}
+
 // WebSocket connection for real-time updates
 const ws = ref<WebSocket | null>(null)
 
@@ -459,7 +530,6 @@ const connectWebSocket = () => {
   ws.value = new WebSocket(wsUrl)
 
   ws.value.onopen = () => {
-    console.log('[Dashboard] WebSocket connected')
     // Subscribe to dashboard updates
     ws.value?.send(JSON.stringify({ type: 'subscribe_dashboard' }))
   }
@@ -467,20 +537,47 @@ const connectWebSocket = () => {
   ws.value.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data)
-      console.log('[Dashboard] WebSocket message:', data)
 
       switch (data.type) {
         case 'student_joined':
-        case 'message_sent':
-        case 'progress_updated':
-          // Refresh dashboard data when any relevant event occurs
-          console.log('[Dashboard] Refreshing data due to:', data.type)
-          refreshDashboard()
+          addNewStudent(data.data)
           break
+
+        case 'message_sent': {
+          // Increment message count and update last activity
+          const studentIndex = findStudentIndex(data.data.deviceId, data.data.groupId)
+          if (studentIndex !== -1 && dashboardData.value?.students?.[studentIndex]) {
+            const currentCount = dashboardData.value.students[studentIndex].messageCount
+            updateStudentRow(data.data.deviceId, data.data.groupId, {
+              messageCount: currentCount + 1,
+              lastActivity: data.data.timestamp,
+              lastMessageAt: data.data.timestamp,
+            })
+          }
+          break
+        }
+
+        case 'progress_updated': {
+          // Update completion percentage and last activity
+          updateStudentRow(data.data.deviceId, data.data.groupId, {
+            currentCompletion: data.data.completion,
+            lastActivity: data.data.timestamp,
+          })
+          break
+        }
+
+        case 'nickname_updated': {
+          // Update student nickname
+          updateStudentRow(data.data.deviceId, data.data.groupId, {
+            nickname: data.data.nickname,
+          })
+          break
+        }
+
         case 'connection':
         case 'subscribed':
-          console.log('[Dashboard]', data.message)
           break
+
         case 'error':
           console.error('[Dashboard] WebSocket error:', data.message)
           break
@@ -491,7 +588,6 @@ const connectWebSocket = () => {
   }
 
   ws.value.onclose = () => {
-    console.log('[Dashboard] WebSocket disconnected, attempting to reconnect in 3 seconds...')
     setTimeout(connectWebSocket, 3000)
   }
 

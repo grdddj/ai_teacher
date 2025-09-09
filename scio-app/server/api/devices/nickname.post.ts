@@ -1,4 +1,5 @@
 import { supabase } from '../../database'
+import { broadcastDashboardEvent } from '../../routes/_ws'
 
 interface UpdateNicknameRequest {
   deviceId: string
@@ -34,6 +35,31 @@ export default defineEventHandler(async (event): Promise<UpdateNicknameResponse>
 
     if (updateError) {
       throw updateError
+    }
+
+    // Get all groups this device belongs to for broadcasting
+    const { data: memberships, error: membershipError } = await supabase
+      .from('group_members')
+      .select('group_id')
+      .eq('device_id', deviceId)
+
+    if (!membershipError && memberships) {
+      // Broadcast nickname update for each group the device belongs to
+      for (const membership of memberships) {
+        try {
+          broadcastDashboardEvent({
+            type: 'nickname_updated',
+            data: {
+              deviceId,
+              groupId: membership.group_id,
+              nickname,
+              timestamp: new Date().toISOString(),
+            },
+          })
+        } catch (error) {
+          console.error('Failed to broadcast nickname update:', error)
+        }
+      }
     }
 
     // Return response
