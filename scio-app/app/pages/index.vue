@@ -369,6 +369,7 @@
                 >
                   <td colspan="6" class="px-6 py-6">
                     <StudentDetails
+                      :ref="(el) => setStudentDetailsRef(el, student.deviceId, student.groupId)"
                       :device-id="student.deviceId"
                       :group-id="student.groupId"
                       @close="toggleStudentDetails(student.deviceId, student.groupId)"
@@ -426,6 +427,9 @@ const expandedRows = ref(new Set<string>())
 // Track recently updated rows for visual feedback
 const recentlyUpdatedRows = ref(new Set<string>())
 const highlightTimeouts = new Map<string, NodeJS.Timeout>()
+
+// Track references to open StudentDetails components
+const studentDetailsRefs = ref(new Map<string, any>())
 
 // Computed values for summary stats
 const averageCompletion = computed(() => {
@@ -497,12 +501,24 @@ const formatRelativeTime = (dateString: string): string => {
   })
 }
 
+// Helper function to set component refs
+const setStudentDetailsRef = (el: any, deviceId: string, groupId: string) => {
+  const key = `${deviceId}-${groupId}`
+  if (el) {
+    studentDetailsRefs.value.set(key, el)
+  } else {
+    studentDetailsRefs.value.delete(key)
+  }
+}
+
 const toggleStudentDetails = (deviceId: string, groupId: string) => {
   const key = `${deviceId}-${groupId}`
   const newSet = new Set(expandedRows.value)
 
   if (newSet.has(key)) {
     newSet.delete(key)
+    // Clean up the ref when closing
+    studentDetailsRefs.value.delete(key)
   } else {
     newSet.add(key)
   }
@@ -533,6 +549,15 @@ const highlightRow = (deviceId: string, groupId: string) => {
   }, 10000)
 
   highlightTimeouts.set(key, timeout)
+}
+
+// Helper function to refresh student details if they're currently open
+const refreshOpenStudentDetails = (deviceId: string, groupId: string) => {
+  const key = `${deviceId}-${groupId}`
+  const detailsComponent = studentDetailsRefs.value.get(key)
+  if (detailsComponent && expandedRows.value.has(key)) {
+    detailsComponent.refreshDetails()
+  }
 }
 
 // Helper functions for selective updates
@@ -644,6 +669,8 @@ const connectWebSocket = () => {
               lastMessageAt: data.data.timestamp,
             })
           }
+          // Refresh student details if open
+          refreshOpenStudentDetails(data.data.deviceId, data.data.groupId)
           break
         }
 
@@ -653,6 +680,8 @@ const connectWebSocket = () => {
             currentCompletion: data.data.completion,
             lastActivity: data.data.timestamp,
           })
+          // Refresh student details if open
+          refreshOpenStudentDetails(data.data.deviceId, data.data.groupId)
           break
         }
 
@@ -661,6 +690,8 @@ const connectWebSocket = () => {
           updateStudentRow(data.data.deviceId, data.data.groupId, {
             nickname: data.data.nickname,
           })
+          // Refresh student details if open
+          refreshOpenStudentDetails(data.data.deviceId, data.data.groupId)
           break
         }
 
@@ -707,5 +738,8 @@ onUnmounted(() => {
     clearTimeout(timeout)
   })
   highlightTimeouts.clear()
+
+  // Clear student details refs
+  studentDetailsRefs.value.clear()
 })
 </script>

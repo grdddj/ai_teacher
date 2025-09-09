@@ -262,13 +262,21 @@ defineEmits<{
   close: []
 }>()
 
+// Create refresh function that will be populated after useFetch
+let refreshDetails: (() => void) | null = null
+
+// Expose refresh function to parent component
+defineExpose({
+  refreshDetails: () => refreshDetails?.(),
+})
+
 // Fetch student details
-const {
-  data,
-  pending,
-  error,
-  refresh: refreshDetails,
-} = await useFetch<StudentDetail>(`/api/dashboard/student/${props.deviceId}/${props.groupId}`)
+const { data, pending, error, refresh } = await useFetch<StudentDetail>(
+  `/api/dashboard/student/${props.deviceId}/${props.groupId}`
+)
+
+// Assign the actual refresh function
+refreshDetails = refresh
 
 // Computed property to get user messages only, sorted chronologically
 const userMessages = computed(() => {
