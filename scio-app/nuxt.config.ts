@@ -6,6 +6,11 @@ export default defineNuxtConfig({
   typescript: {
     includeWorkspace: true,
   },
+  nitro: {
+    experimental: {
+      websocket: true,
+    },
+  },
   vite: {
     server: {
       hmr: {
